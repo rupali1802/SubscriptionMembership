@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plans — MembershipSubscription</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/dashboard" class="nav-logo">Membership<span>Subscription</span></a>
+    <div class="nav-right">
+      <span class="nav-user">Hello, <strong id="navName">—</strong></span>
+      <button class="btn-logout" onclick="logout()">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <div class="page-header" style="text-align:center;max-width:700px;margin:0 auto 56px;">
+      <h1>Choose your plan</h1>
+      <p id="planMessage">Simple, transparent pricing. No hidden fees. Cancel anytime.</p>
+    </div>
+
+    <div class="plans-grid" id="plansGrid">
+      <div class="plan-card" style="text-align:center;padding:48px;grid-column:1/-1;color:var(--text-muted)">
+        Loading plans...
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Details Modal -->
+  <div id="planModal" class="modal" style="display: none;">
+    <div class="modal-overlay" onclick="closePlanModal()"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalPlanName">—</h2>
+        <button class="modal-close" onclick="closePlanModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="modal-label">Price</div>
+          <div class="modal-price"><span id="modalPlanPrice">—</span> <span id="modalDuration">—</span></div>
+        </div>
+        
+        <div class="modal-section">
+          <div class="modal-label">Description</div>
+          <p id="modalPlanDesc" style="color: var(--text-muted); font-size: 15px; line-height: 1.6;">—</p>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-label">What's Included</div>
+          <div id="modalPlanBenefits" class="benefits-list">
+            <!-- Benefits will be inserted here -->
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-label">Plan Details</div>
+          <div class="plan-details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Duration</span>
+              <span class="detail-value" id="modalDetailDays">—</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Cancellation</span>
+              <span class="detail-value">Anytime</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Support</span>
+              <span class="detail-value" id="modalDetailSupport">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closePlanModal()">Close</button>
+        <button class="btn btn-primary" id="selectPlanBtn" onclick="confirmPlanSelection()">Select Plan</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="/js/script.js"></script>
+  <script>
+    let userActivePlan = null;
+    let selectedPlanForModal = null;
+
+    const planBenefits = {
+      'Basic': [
+        'Access to core features',
+        'Email support',
+        'Basic analytics',
+        'Single device access',
+        'Monthly updates'
+      ],
+      'Standard': [
+        'All Basic features included',
+        'Priority email & chat support',
+        'Advanced analytics',
+        'Multiple device access (up to 3)',
+        'Weekly feature updates',
+        'Custom integrations'
+      ],
+      'Premium': [
+        'All Standard features included',
+        '24/7 dedicated support',
+        'Full-featured analytics',
+        'Unlimited device access',
+        'Real-time updates',
+        'API access',
+        'Custom development support',
+        'White-label options'
+      ]
+    };
+
+    const planSupport = {
+      'Basic': 'Email',
+      'Standard': 'Email & Chat',
+      'Premium': '24/7 Dedicated'
+    };
+
+    requireAuth();
+    document.getElementById('navName').textContent = localStorage.getItem('userName') || 'User';
+
+    async function checkActivePlan() {
+      try {
+        const res = await authFetch('/api/dashboard/active-plan');
+        const data = await res.json();
+        if (data.plan) {
+          userActivePlan = data.plan;
+          document.getElementById('planMessage').innerHTML = 
+            `<span style="color: var(--warn);">⚠ You have an active <strong>${data.plan.plan_name}</strong> plan</span><br><span style="font-size: 14px;">Cancel your current plan to select a different one</span>`;
+        }
+      } catch (e) {}
+    }
+
+    async function loadPlans() {
+      try {
+        const res = await fetch('/api/plans');
+        const plans = await res.json();
+        const grid = document.getElementById('plansGrid');
+        grid.innerHTML = '';
+
+        plans.forEach((plan) => {
+          const isPopular = plan.name === 'Standard';
+          const durationLabel = plan.duration_days >= 365
+            ? 'per year' : plan.duration_days >= 60
+            ? `for ${plan.duration_days} days` : 'per month';
+          const isActive = userActivePlan && userActivePlan.plan_id === plan.id;
+
+          grid.innerHTML += `
+            <div class="plan-card ${isPopular ? 'popular' : ''} ${isActive ? 'active-plan-highlight' : ''}">
+              ${isPopular ? '<div class="popular-tag">Most popular</div>' : ''}
+              ${isActive ? '<div class="active-badge">Current Plan</div>' : ''}
+              <div class="plan-name">${plan.name}</div>
+              <div class="plan-price"><sup>₹</sup>${Number(plan.price).toLocaleString('en-IN')}</div>
+              <div class="plan-duration">${durationLabel}</div>
+              <div class="plan-desc">${plan.description}</div>
+              <div class="divider"></div>
+              <div style="display: flex; gap: 12px; flex-direction: column;">
+                <button class="btn btn-outline" style="padding: 10px 24px; font-size: 13px;"
+                  onclick="openPlanModal(${plan.id}, '${plan.name}', ${plan.price}, ${plan.duration_days}, '${plan.description}')">
+                  View Details →
+                </button>
+                <button class="btn ${isPopular ? 'btn-primary' : 'btn-outline'} ${isActive ? 'disabled' : ''}"
+                  onclick="selectPlan(${plan.id}, '${plan.name}')"
+                  id="selectBtn_${plan.id}"
+                  ${isActive || userActivePlan ? 'disabled' : ''}>
+                  ${isActive ? 'Current Plan' : 'Get ' + plan.name}
+                </button>
+              </div>
+            </div>`;
+        });
+      } catch { showToast('Could not load plans.', 'error'); }
+    }
+
+    function openPlanModal(planId, planName, price, days, description) {
+      selectedPlanForModal = { planId, planName };
+      
+      const durationLabel = days >= 365 ? 'per year' : days >= 60 ? `for ${days} days` : 'per month';
+      const daysLabel = days >= 365 ? `${days} days (1 year)` : `${days} days`;
+      
+      document.getElementById('modalPlanName').textContent = planName + ' Plan';
+      document.getElementById('modalPlanPrice').textContent = `₹${Number(price).toLocaleString('en-IN')}`;
+      document.getElementById('modalDuration').textContent = durationLabel;
+      document.getElementById('modalPlanDesc').textContent = description;
+      document.getElementById('modalDetailDays').textContent = daysLabel;
+      document.getElementById('modalDetailSupport').textContent = planSupport[planName];
+      
+      const benefitsList = document.getElementById('modalPlanBenefits');
+      benefitsList.innerHTML = (planBenefits[planName] || []).map(benefit =>
+        `<div class="benefit-item">
+          <span style="color: var(--accent); font-weight: 700; font-size: 18px;">✓</span>
+          <span>${benefit}</span>
+        </div>`
+      ).join('');
+
+      const selectBtn = document.getElementById('selectPlanBtn');
+      if (userActivePlan) {
+        selectBtn.disabled = true;
+        selectBtn.textContent = 'Cancel Active Plan First';
+        selectBtn.style.opacity = '0.6';
+        selectBtn.style.cursor = 'not-allowed';
+      } else {
+        selectBtn.disabled = false;
+        selectBtn.textContent = 'Select ' + planName;
+        selectBtn.style.opacity = '1';
+        selectBtn.style.cursor = 'pointer';
+      }
+
+      document.getElementById('planModal').style.display = 'flex';
+    }
+
+    function closePlanModal() {
+      document.getElementById('planModal').style.display = 'none';
+      selectedPlanForModal = null;
+    }
+
+    function confirmPlanSelection() {
+      if (selectedPlanForModal) {
+        selectPlan(selectedPlanForModal.planId, selectedPlanForModal.planName);
+      }
+    }
+
+    async function selectPlan(planId, planName) {
+      if (userActivePlan) {
+        showToast('You have an active plan. Cancel it first to select another.', 'warn');
+        return;
+      }
+
+      const res = await authFetch('/api/plans/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId })
+      });
+      const data = await res.json();
+      showToast(data.message, res.ok ? 'success' : 'error');
+      if (res.ok) {
+        closePlanModal();
+        setTimeout(() => window.location.href = '/dashboard', 1400);
+      }
+    }
+
+    checkActivePlan().then(() => loadPlans());
+  </script>
+</body>
+</html>

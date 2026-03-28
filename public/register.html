@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — Memberio</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="auth-wrapper">
+    <div class="auth-brand">
+      <div class="brand-logo">Membership<span>Subscription</span></div>
+      <div class="brand-tagline">
+        <h1>Start managing subscriptions today</h1>
+        <p>Create your account and pick a plan that fits your needs.</p>
+      </div>
+      <div class="brand-features">
+        <div class="brand-feat">Free to get started</div>
+        <div class="brand-feat">Cancel anytime</div>
+        <div class="brand-feat">Secure & private</div>
+      </div>
+    </div>
+    <div class="auth-form-wrap">
+      <div class="auth-card">
+        <h2>Create account</h2>
+        <p class="subtitle">Already have one? <a href="/">Sign in</a></p>
+        <div class="form-group">
+          <label>Full name</label>
+          <input type="text" id="name" placeholder="Arjun Sharma" />
+        </div>
+        <div class="form-group">
+          <label>Email address</label>
+          <input type="email" id="email" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+          <label>Phone (optional)</label>
+          <input type="tel" id="phone" placeholder="+91 98765 43210" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" placeholder="Min. 6 characters" />
+        </div>
+        <button class="btn btn-primary" onclick="handleRegister()">Create account</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="/js/script.js"></script>
+  <script>
+    async function handleRegister() {
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const password = document.getElementById('password').value;
+      if (!name || !email || !password) return showToast('Name, email & password required.', 'warn');
+      if (password.length < 6) return showToast('Password must be at least 6 characters.', 'warn');
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, phone })
+        });
+        const data = await res.json();
+        if (!res.ok) return showToast(data.message, 'error');
+        showToast('Account created! Please sign in.', 'success');
+        setTimeout(() => window.location.href = '/', 1200);
+      } catch { showToast('Network error.', 'error'); }
+    }
+  </script>
+</body>
+</html>

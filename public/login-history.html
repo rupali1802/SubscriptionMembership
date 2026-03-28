@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login History — MembershipSubscription</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/dashboard" class="nav-logo">Membership<span>Subscription</span></a>
+    <div class="nav-right">
+      <span class="nav-user">Hello, <strong id="navName">—</strong></span>
+      <button class="btn-logout" onclick="logout()">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <div class="page-header">
+      <h1>Login History</h1>
+      <p>View all your account login activities and security details.</p>
+    </div>
+
+    <div style="display: flex; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+      <div></div>
+      <div style="display: flex; gap: 12px;">
+        <a href="/dashboard" class="btn btn-outline" style="width: auto;">Dashboard</a>
+        <a href="/plan-history" class="btn btn-outline" style="width: auto;">Plan History</a>
+      </div>
+    </div>
+
+    <!-- Login History Table -->
+    <div class="history-card">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Login Time</th>
+            <th>IP Address</th>
+            <th>Device Info</th>
+          </tr>
+        </thead>
+        <tbody id="loginHistoryBody">
+          <tr>
+            <td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              Loading login history...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" style="display: none; text-align: center; padding: 60px 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+      <h3 style="font-family: 'DM Serif Display', serif; font-size: 24px; margin-bottom: 8px;">No login history</h3>
+      <p style="color: var(--text-muted);">Your login activity will appear here.</p>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="/js/script.js"></script>
+  <script>
+    requireAuth();
+    document.getElementById('navName').textContent = localStorage.getItem('userName') || 'User';
+
+    async function loadLoginHistory() {
+      try {
+        const res = await authFetch('/api/history/login-history');
+        const logins = await res.json();
+        const tbody = document.getElementById('loginHistoryBody');
+        const emptyState = document.getElementById('emptyState');
+        
+        if (!res.ok || logins.length === 0) {
+          tbody.style.display = 'none';
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        tbody.innerHTML = logins.map(login => {
+          const loginDate = new Date(login.login_time);
+          const formattedDate = loginDate.toLocaleDateString('en-IN', { 
+            day: 'numeric', month: 'short', year: 'numeric' 
+          });
+          const formattedTime = loginDate.toLocaleTimeString('en-IN', { 
+            hour: '2-digit', minute: '2-digit', second: '2-digit' 
+          });
+          const ipAddress = login.ip_address || 'Unknown';
+          const deviceInfo = login.user_agent ? (login.user_agent.length > 50 ? login.user_agent.substring(0, 50) + '...' : login.user_agent) : 'Unknown';
+          
+          return `
+            <tr>
+              <td style="font-weight: 600;">
+                <div style="font-size: 14px;">${formattedDate}</div>
+                <div style="font-size: 12px; color: var(--text-muted);">${formattedTime}</div>
+              </td>
+              <td>
+                <code style="background: var(--accent-light); color: var(--accent); padding: 4px 8px; border-radius: 6px; font-size: 12px;">
+                  ${ipAddress}
+                </code>
+              </td>
+              <td style="font-size: 13px; color: var(--text-muted);">${deviceInfo}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch {
+        showToast('Could not load login history.', 'error');
+      }
+    }
+
+    loadLoginHistory();
+  </script>
+</body>
+</html>

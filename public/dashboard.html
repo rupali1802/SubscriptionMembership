@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Memberio</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/dashboard" class="nav-logo">Membership<span>Subscription</span></a>
+    <div class="nav-right">
+      <span class="nav-user">Hello, <strong id="navName">—</strong></span>
+      <button class="btn-logout" onclick="logout()">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <div class="page-header">
+      <h1>Your Dashboard</h1>
+      <p>Manage your subscription and track your membership progress in real-time.</p>
+    </div>
+
+    <div style="display: flex; gap: 12px; margin-bottom: 28px; justify-content: flex-end;">
+      <a href="/login-history" class="btn btn-outline" style="width: auto; font-size: 13px;">Login History</a>
+      <a href="/plan-history" class="btn btn-outline" style="width: auto; font-size: 13px;">Plan History</a>
+    </div>
+
+    <!-- Active Plan Card -->
+    <div id="activePlanSection">
+      <div class="active-plan-card" id="planCard" style="display:none">
+        <div class="plan-badge" id="planBadge">Active</div>
+        <h2 id="planTitle">—</h2>
+        <p id="planMeta" style="color:var(--text-muted);font-size:15px;margin-bottom:16px;font-weight:500;"></p>
+        <div class="progress-bar-wrap">
+          <div class="progress-label">
+            <span>Subscription Progress</span>
+            <span id="daysLeft" style="font-weight:700;color:var(--text);">—</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:28px;flex-wrap:wrap;">
+          <a href="/plans" class="btn btn-outline" style="width:auto;">Upgrade to Premium</a>
+          <button class="btn btn-danger" style="width:auto;" onclick="cancelPlan()">Cancel Subscription</button>
+        </div>
+      </div>
+
+      <div class="active-plan-card no-plan-card" id="noPlanCard" style="display:none">
+        <div class="plan-badge none">No active subscription</div>
+        <h2 style="font-family:'DM Serif Display',serif;font-size:32px;font-weight:400;margin:12px 0 12px;">No Active Membership</h2>
+        <p>Start your subscription today to unlock all premium features!</p>
+        <a href="/plans" class="btn btn-primary" style="width:auto;display:inline-flex;margin-top:16px;">Explore Plans →</a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="dashboard-grid" id="statsGrid" style="display:none">
+      <div class="card">
+        <div class="card-label">Days Remaining</div>
+        <div class="card-value" id="statDays">—</div>
+        <div class="card-sub">Until your plan expires</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Plan Investment</div>
+        <div class="card-value" id="statPrice">—</div>
+        <div class="card-sub">Your current plan value</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="/js/script.js"></script>
+  <script>
+    requireAuth();
+    document.getElementById('navName').textContent = localStorage.getItem('userName') || 'User';
+
+    async function loadDashboard() {
+      try {
+        const res = await authFetch('/api/dashboard/active-plan');
+        const data = await res.json();
+        if (!res.ok) return;
+
+        if (!data.plan) {
+          document.getElementById('noPlanCard').style.display = 'block';
+        } else {
+          const p = data.plan;
+          document.getElementById('planCard').style.display = 'block';
+          document.getElementById('statsGrid').style.display = 'grid';
+          document.getElementById('planTitle').textContent = p.plan_name + ' Plan';
+          document.getElementById('planMeta').textContent =
+            `Active · Expires ${new Date(p.end_date).toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' })}`;
+          const days = Math.max(0, p.days_remaining);
+          document.getElementById('daysLeft').textContent = `${days} days left`;
+          document.getElementById('statDays').textContent = days;
+          document.getElementById('statPrice').textContent = '₹' + Number(p.price).toLocaleString('en-IN');
+          // Progress: assume plan duration from start
+          const start = new Date(p.start_date), end = new Date(p.end_date);
+          const total = (end - start) / 86400000;
+          const used = total - days;
+          document.getElementById('progressFill').style.width = Math.min(100, (used / total) * 100) + '%';
+        }
+      } catch { showToast('Could not load dashboard.', 'error'); }
+    }
+
+    async function cancelPlan() {
+      if (!confirm('Are you sure you want to cancel your plan?')) return;
+      const res = await authFetch('/api/plans/cancel', { method: 'POST' });
+      const data = await res.json();
+      showToast(data.message, res.ok ? 'success' : 'error');
+      if (res.ok) setTimeout(() => location.reload(), 1200);
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

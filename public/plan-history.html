@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plan History — MembershipSubscription</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/dashboard" class="nav-logo">Membership<span>Subscription</span></a>
+    <div class="nav-right">
+      <span class="nav-user">Hello, <strong id="navName">—</strong></span>
+      <button class="btn-logout" onclick="logout()">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <div class="page-header">
+      <h1>Plan History</h1>
+      <p>Track all your subscription and plan changes.</p>
+    </div>
+
+    <div style="display: flex; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+      <div></div>
+      <div style="display: flex; gap: 12px;">
+        <a href="/dashboard" class="btn btn-outline" style="width: auto;">Dashboard</a>
+        <a href="/login-history" class="btn btn-outline" style="width: auto;">Login History</a>
+      </div>
+    </div>
+
+    <!-- Plan History Table -->
+    <div class="history-card">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Plan Name</th>
+            <th>Price</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Status</th>
+            <th>Changed On</th>
+          </tr>
+        </thead>
+        <tbody id="planHistoryBody">
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              Loading plan history...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" style="display: none; text-align: center; padding: 60px 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">📅</div>
+      <h3 style="font-family: 'DM Serif Display', serif; font-size: 24px; margin-bottom: 8px;">No plan history</h3>
+      <p style="color: var(--text-muted); margin-bottom: 24px;">You haven't made any subscription changes yet.</p>
+      <a href="/plans" class="btn btn-primary" style="width: auto; display: inline-flex;">Choose a Plan</a>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="/js/script.js"></script>
+  <script>
+    requireAuth();
+    document.getElementById('navName').textContent = localStorage.getItem('userName') || 'User';
+
+    async function loadPlanHistory() {
+      try {
+        const res = await authFetch('/api/history/plan-history');
+        const plans = await res.json();
+        const tbody = document.getElementById('planHistoryBody');
+        const emptyState = document.getElementById('emptyState');
+        
+        if (!res.ok || plans.length === 0) {
+          tbody.style.display = 'none';
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        tbody.innerHTML = plans.map(plan => {
+          const startDate = new Date(plan.start_date).toLocaleDateString('en-IN', { 
+            day: 'numeric', month: 'short', year: 'numeric' 
+          });
+          const endDate = new Date(plan.end_date).toLocaleDateString('en-IN', { 
+            day: 'numeric', month: 'short', year: 'numeric' 
+          });
+          const changedDate = new Date(plan.action_date).toLocaleDateString('en-IN', { 
+            day: 'numeric', month: 'short', year: 'numeric' 
+          });
+          const changedTime = new Date(plan.action_date).toLocaleTimeString('en-IN', { 
+            hour: '2-digit', minute: '2-digit' 
+          });
+          
+          let statusBadge = '';
+          if (plan.status === 'active') {
+            statusBadge = '<span style="background: var(--accent-light); color: var(--accent); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">Active</span>';
+          } else if (plan.status === 'expired') {
+            statusBadge = '<span style="background: #fef3e8; color: var(--warn); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">Expired</span>';
+          } else {
+            statusBadge = '<span style="background: #fdecea; color: var(--danger); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">Cancelled</span>';
+          }
+          
+          return `
+            <tr>
+              <td style="font-weight: 600; color: var(--accent);">${plan.plan_name}</td>
+              <td>₹${Number(plan.plan_price).toLocaleString('en-IN')}</td>
+              <td>${startDate}</td>
+              <td>${endDate}</td>
+              <td>${statusBadge}</td>
+              <td style="font-size: 13px; color: var(--text-muted);">
+                <div>${changedDate}</div>
+                <div style="font-size: 11px;">${changedTime}</div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch {
+        showToast('Could not load plan history.', 'error');
+      }
+    }
+
+    loadPlanHistory();
+  </script>
+</body>
+</html>
